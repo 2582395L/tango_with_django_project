@@ -1,18 +1,11 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse
-from rango.models import Category
-from rango.models import Page
-from rango.forms import CategoryForm
-from django.shortcuts import redirect
-from rango.forms import PageForm
 from django.urls import reverse
-from rango.forms import UserForm, UserProfileForm
-from django.contrib.auth import authenticate, login
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from rango.models import Category, Page
+from rango.forms import CategoryForm, PageForm, UserForm, UserProfileForm
 
-
-# Create your views here.
 def index(request):
     category_list = Category.objects.order_by('-likes')[:5]
     page_list = Page.objects.order_by('-views')[:5]
@@ -23,42 +16,28 @@ def index(request):
     context_dict['pages'] = page_list
     context_dict['extra'] = 'From the model solution on GitHub'
 
-
-    # Render the response and send it back!
     return render(request, 'rango/index.html', context=context_dict)
 
-# Chapter3: creat a new view called about.
 def about(request):
-    print(request.method)
-    print(request.user)
+    # Spoiler: you don't need to pass a context dictionary here.
     return render(request, 'rango/about.html')
 
 def show_category(request, category_name_slug):
-    # Create a context dictionary which we can pass
-    # to the template rendering engine.
     context_dict = {}
 
     try:
-        # Can we find a category name slug with the given name?
-        # If we can't, the .get() method raises a DoesNotExist exception.
-        # The .get() method returns one model instance or raises an exception.
         category = Category.objects.get(slug=category_name_slug)
-
-        # Retrieve all of the associated pages.
-        # The filter() will return a list of page objects or an empty list.
         pages = Page.objects.filter(category=category)
 
-        # Adds our results list to the template context under name pages.
         context_dict['pages'] = pages
-
         context_dict['category'] = category
     except Category.DoesNotExist:
-
-        context_dict['category'] = None
         context_dict['pages'] = None
-# Go render the response and return it to the client.
+        context_dict['category'] = None
+    
     return render(request, 'rango/category.html', context=context_dict)
 
+@login_required
 def add_category(request):
     form = CategoryForm()
 
@@ -66,24 +45,23 @@ def add_category(request):
         form = CategoryForm(request.POST)
 
         if form.is_valid():
-# Save the new category to the database.
             form.save(commit=True)
-
-            return redirect('/rango/')
+            return redirect(reverse('rango:index'))
         else:
             print(form.errors)
-
+    
     return render(request, 'rango/add_category.html', {'form': form})
 
+@login_required
 def add_page(request, category_name_slug):
     try:
         category = Category.objects.get(slug=category_name_slug)
-    except Category.DoesNotExist:
+    except:
         category = None
-
-# You cannot add a page to a Category that does not exist...
+    
+    # You cannot add a page to a Category that does not exist... DM
     if category is None:
-        return redirect('/rango/')
+        return redirect(reverse('rango:index'))
 
     form = PageForm()
 
@@ -98,10 +76,9 @@ def add_page(request, category_name_slug):
                 page.save()
 
                 return redirect(reverse('rango:show_category', kwargs={'category_name_slug': category_name_slug}))
-
         else:
-            print(form.errors)
-
+            print(form.errors)  # This could be better done; for the purposes of TwD, this is fine. DM.
+    
     context_dict = {'form': form, 'category': category}
     return render(request, 'rango/add_page.html', context=context_dict)
 
@@ -154,7 +131,7 @@ def user_login(request):
 
 @login_required
 def restricted(request):
-    return HttpResponse("Since you're logged in, you can see this text!")
+    return render(request, 'rango/restricted.html')
 
 @login_required
 def user_logout(request):
